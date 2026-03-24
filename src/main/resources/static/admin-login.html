@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHer — Admin Login</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  body {
+    background:
+      radial-gradient(ellipse 60% 50% at 30% 50%, rgba(232,41,74,.12) 0%, transparent 70%),
+      var(--night);
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div style="text-align:center;margin-bottom:6px;font-size:2rem">🛡️</div>
+    <div class="auth-logo">Safe<span>Her</span></div>
+    <p class="auth-sub">Admin Panel — Restricted Access</p>
+
+    <div style="background:rgba(232,41,74,.08);border:1px solid rgba(232,41,74,.2);border-radius:10px;padding:12px 16px;font-size:.82rem;color:rgba(255,255,255,.6);margin-bottom:24px;text-align:center">
+      ⚠️ This area is for administrators only
+    </div>
+
+    <div class="field"><label>Admin Username</label><input type="text" id="username" placeholder="admin"/></div>
+    <div class="field"><label>Admin Password</label><input type="password" id="password" placeholder="Password"/></div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;border-radius:10px;padding:13px" onclick="login()" id="loginBtn">
+      Enter Admin Panel
+    </button>
+
+    <p id="msg" style="text-align:center;margin-top:14px;font-size:.85rem;color:var(--rose-lt)"></p>
+
+    <div class="divider"></div>
+    <p style="text-align:center;font-size:.78rem;color:var(--muted)">
+      Not an admin? <a href="login.html" style="color:var(--rose-lt)">Go to user login →</a>
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function login() {
+  const user = document.getElementById('username').value.trim();
+  const pass = document.getElementById('password').value;
+  const btn  = document.getElementById('loginBtn');
+
+  if (!user || !pass) { showToast('Enter username and password', 'err'); return; }
+
+  btn.innerHTML = '<span class="spinner"></span>Verifying...'; btn.disabled = true;
+
+  setTimeout(() => {
+    if (user === 'admin' && pass === '1234') {
+      localStorage.setItem('admin', 'true');
+      showToast('✅ Welcome, Admin!', 'ok');
+      setTimeout(() => window.location.href = 'admin.html', 700);
+    } else {
+      showToast('❌ Invalid credentials', 'err');
+      document.getElementById('msg').textContent = 'Wrong username or password.';
+      btn.innerHTML = 'Enter Admin Panel'; btn.disabled = false;
+    }
+  }, 800);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

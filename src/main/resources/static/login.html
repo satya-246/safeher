@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHer — Login</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  .auth-wrap {
+    background:
+      radial-gradient(ellipse 70% 50% at 70% 30%, rgba(232,41,74,.18) 0%, transparent 70%),
+      var(--night);
+  }
+  .hero-side {
+    position: fixed; left: 0; top: 0; width: 45%; height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 60px; pointer-events: none;
+  }
+  .hero-tagline {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.2rem, 4vw, 3.5rem);
+    font-weight: 900; line-height: 1.1; margin-bottom: 16px;
+  }
+  .hero-tagline span { color: var(--rose); }
+  .hero-desc { color: rgba(255,255,255,.45); font-size: .95rem; line-height: 1.7; max-width: 340px; }
+  .hero-dots { display: flex; gap: 10px; margin-top: 32px; }
+  .hero-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(232,41,74,.4); }
+  .hero-dot:first-child { background: var(--rose); width: 24px; border-radius: 4px; }
+  .auth-right { margin-left: 45%; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; flex: 1; }
+  @media(max-width:768px) {
+    .hero-side { display: none; }
+    .auth-right { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="auth-wrap" style="display:block; position:relative">
+
+  <!-- Left decorative side -->
+  <div class="hero-side">
+    <div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;margin-bottom:48px">
+      Safe<span style="color:var(--rose)">Her</span>
+    </div>
+    <div class="hero-tagline">Your Safety,<br>Our <span>Priority</span></div>
+    <p class="hero-desc">One tap sends your live location to all emergency contacts instantly. Stay protected, stay connected.</p>
+    <div class="hero-dots">
+      <div class="hero-dot"></div>
+      <div class="hero-dot"></div>
+      <div class="hero-dot"></div>
+    </div>
+  </div>
+
+  <!-- Right: Auth Box -->
+  <div class="auth-right">
+    <div class="auth-box">
+      <div class="auth-logo">Safe<span>Her</span></div>
+      <p class="auth-sub">Women Safety System • BIET CSE/IT</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="login-form">
+        <div class="field"><label>Email Address</label><input type="email" id="loginEmail" placeholder="you@example.com"/></div>
+        <div class="field"><label>Password</label><input type="password" id="loginPass" placeholder="Your password"/></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;border-radius:10px;padding:13px" id="loginBtn" onclick="doLogin()">
+          Login to SafeHer
+        </button>
+        <p style="text-align:center;margin-top:16px;font-size:.82rem;color:var(--muted)">
+          No account? <a onclick="switchTab('register')" style="color:var(--rose-lt);cursor:pointer">Register now</a>
+        </p>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="register-form" style="display:none">
+        <div class="field"><label>Full Name</label><input type="text" id="regName" placeholder="Your full name"/></div>
+        <div class="field"><label>Email Address</label><input type="email" id="regEmail" placeholder="you@example.com"/></div>
+        <div class="field"><label>Phone Number</label><input type="tel" id="regPhone" placeholder="+91 XXXXX XXXXX"/></div>
+        <div class="field"><label>Password</label><input type="password" id="regPass" placeholder="Create a password"/></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;border-radius:10px;padding:13px" id="registerBtn" onclick="doRegister()">
+          Create Account
+        </button>
+        <p style="text-align:center;margin-top:16px;font-size:.82rem;color:var(--muted)">
+          Already registered? <a onclick="switchTab('login')" style="color:var(--rose-lt);cursor:pointer">Login here</a>
+        </p>
+      </div>
+
+      <p id="msg" style="text-align:center;margin-top:12px;font-size:.85rem;color:var(--rose-lt)"></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://10.195.40.223:8086';
+
+function switchTab(tab) {
+  document.getElementById('login-form').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  if (!email || !pass) { showToast('Enter email and password', 'err'); return; }
+
+  const btn = document.getElementById('loginBtn');
+  btn.innerHTML = '<span class="spinner"></span>Logging in...'; btn.disabled = true;
+
+  try {
+    const res  = await fetch(API + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (data && data.id) {
+      localStorage.setItem('userId', data.id);
+      localStorage.setItem('userName', data.name);
+      localStorage.setItem('userPhone', data.phone);
+      showToast('✅ Welcome back, ' + data.name + '!', 'ok');
+      setTimeout(() => window.location.href = 'index.html', 900);
+    } else {
+      showToast('❌ Invalid email or password', 'err');
+    }
+  } catch(e) { showToast('❌ Cannot connect to server', 'err'); }
+  btn.innerHTML = 'Login to SafeHer'; btn.disabled = false;
+}
+
+async function doRegister() {
+  const name  = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const pass  = document.getElementById('regPass').value;
+  if (!name || !email || !phone || !pass) { showToast('Fill in all fields', 'err'); return; }
+
+  const btn = document.getElementById('registerBtn');
+  btn.innerHTML = '<span class="spinner"></span>Creating...'; btn.disabled = true;
+
+  try {
+    const res  = await fetch(API + '/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password: pass })
+    });
+    const data = await res.json();
+    if (data && data.id) {
+      showToast('🎉 Account created! Please login.', 'ok');
+      setTimeout(() => switchTab('login'), 1200);
+    } else {
+      showToast('❌ Registration failed. Email may already exist.', 'err');
+    }
+  } catch(e) { showToast('❌ Cannot connect to server', 'err'); }
+  btn.innerHTML = 'Create Account'; btn.disabled = false;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('login-form').style.display !== 'none') doLogin();
+    else doRegister();
+  }
+});
+</script>
+</body>
+</html>

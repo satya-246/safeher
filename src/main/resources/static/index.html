@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHer — Dashboard</title>
+<link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+  body {
+    background:
+      radial-gradient(ellipse 80% 50% at 60% 10%, rgba(232,41,74,.12) 0%, transparent 65%),
+      var(--night);
+  }
+  .sos-btn {
+    width: 160px; height: 160px; border-radius: 50%;
+    background: radial-gradient(circle, #ff3355 0%, var(--rose-dk) 100%);
+    border: none; cursor: pointer; color: var(--white);
+    font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900;
+    letter-spacing: 3px;
+    box-shadow: 0 0 0 20px rgba(232,41,74,.1), 0 0 0 40px rgba(232,41,74,.05);
+    transition: all .2s; position: relative;
+    animation: pulseRing 2.5s ease-in-out infinite;
+  }
+  .sos-btn:hover  { transform: scale(1.06); }
+  .sos-btn:active { transform: scale(.96); }
+  .sos-btn.sending { background: radial-gradient(circle,#f59e0b,#d97706); animation: none; }
+  .sos-btn.sent    { background: radial-gradient(circle,#22c55e,#16a34a); animation: none; }
+
+  .action-pills { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .action-pill {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 20px; border-radius: 14px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: .78rem; font-weight: 500;
+    color: var(--white); transition: all .2s; min-width: 80px;
+  }
+  .action-pill i { font-size: 1.2rem; }
+  .pill-call  { background: rgba(34,197,94,.12);  border: 1px solid rgba(34,197,94,.2); }
+  .pill-call:hover { background: rgba(34,197,94,.22); transform: translateY(-2px); }
+  .pill-sms   { background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.2); }
+  .pill-sms:hover { background: rgba(59,130,246,.22); transform: translateY(-2px); }
+  .pill-wa    { background: rgba(37,211,102,.12); border: 1px solid rgba(37,211,102,.2); }
+  .pill-wa:hover { background: rgba(37,211,102,.22); transform: translateY(-2px); }
+  .pill-safe  { background: rgba(245,200,66,.1);  border: 1px solid rgba(245,200,66,.2); }
+  .pill-safe:hover { background: rgba(245,200,66,.2); transform: translateY(-2px); }
+
+  .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid rgba(232,41,74,.1); border-radius: var(--radius); padding: 18px 16px; text-align: center; }
+  .stat-num  { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; color: var(--rose-lt); }
+  .stat-lbl  { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+  .location-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; font-size: .82rem; color: rgba(255,255,255,.6); }
+  .loc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: blink 1.5s infinite; }
+
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media(max-width:640px) { .dash-grid { grid-template-columns: 1fr; } .stats-row { grid-template-columns: 1fr 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">Safe<span>Her</span></div>
+  <div class="nav-links">
+    <a href="index.html"    class="nav-link active">🏠 <span>Home</span></a>
+    <a href="alerts.html"   class="nav-link">🚨 <span>Alerts</span></a>
+    <a href="contacts.html" class="nav-link">👥 <span>Contacts</span></a>
+    <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Welcome -->
+  <div style="margin-bottom:28px;animation:fadeUp .6s ease both">
+    <h1 style="font-size:clamp(1.6rem,4vw,2.4rem)">Hello, <span style="color:var(--rose)" id="userName">there</span> 👋</h1>
+    <p class="text-muted" style="margin-top:6px">Stay safe. Your emergency system is active.</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" style="animation:fadeUp .6s .1s ease both;opacity:0;animation-fill-mode:forwards">
+    <div class="stat-card"><div class="stat-num" id="statAlerts">0</div><div class="stat-lbl">SOS Alerts</div></div>
+    <div class="stat-card"><div class="stat-num" id="statCheckins">0</div><div class="stat-lbl">Safe Check-ins</div></div>
+    <div class="stat-card"><div class="stat-num" id="statContacts">0</div><div class="stat-lbl">Contacts</div></div>
+  </div>
+
+  <!-- SOS Card -->
+  <div class="card" style="text-align:center;padding:40px 24px;animation:fadeUp .6s .2s ease both;opacity:0;animation-fill-mode:forwards">
+    <div class="card-title">🚨 Emergency SOS</div>
+    <div style="margin-bottom:16px">
+      <button class="sos-btn" id="sosBtn" onclick="sendSOS()">SOS</button>
+    </div>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:20px" id="sosStatus">
+      Press to send emergency alert to all contacts
+    </p>
+
+    <!-- Action Pills — now using REAL contact phone -->
+    <div class="action-pills">
+      <button class="action-pill pill-call" onclick="callContact()">
+        <i class="fa fa-phone" style="color:#22c55e"></i>Call
+      </button>
+      <button class="action-pill pill-sms" onclick="sendSMS()">
+        <i class="fa fa-message" style="color:#60a5fa"></i>SMS
+      </button>
+      <button class="action-pill pill-wa" onclick="sendWhatsApp()">
+        <i class="fa-brands fa-whatsapp" style="color:#25D366"></i>WhatsApp
+      </button>
+      <!-- ✅ NEW: I'm Safe check-in button -->
+      <button class="action-pill pill-safe" onclick="doSafeCheckin()">
+        <i class="fa fa-shield-halved" style="color:#f5c842"></i>I'm Safe
+      </button>
+    </div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:10px" id="contactHint">Loading contact info...</p>
+  </div>
+
+  <!-- Bottom grid -->
+  <div class="dash-grid" style="animation:fadeUp .6s .3s ease both;opacity:0;animation-fill-mode:forwards">
+
+    <!-- Location -->
+    <div class="card">
+      <div class="card-title">📍 Live Location</div>
+      <div class="location-bar" id="locationBar">
+        <div class="loc-dot"></div>
+        <span id="locationText">Getting your location...</span>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <a id="mapLink" href="#" target="_blank" class="btn btn-outline btn-sm" style="border-radius:8px;font-size:.78rem;display:inline-flex">
+          🗺️ Open in Maps
+        </a>
+      </div>
+    </div>
+
+    <!-- Quick contacts -->
+    <div class="card">
+      <div class="card-title">👥 Emergency Contacts</div>
+      <div id="quickContacts">
+        <div class="empty-state" style="padding:20px">
+          <a href="contacts.html" style="color:var(--rose-lt)">Add emergency contacts →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent alerts + checkins -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-title">📋 Recent Activity</div>
+      <div id="recentActivity"><div class="empty-state">No activity yet. Stay safe! 💕</div></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API      = 'http://10.195.40.223:8086';
+const userId   = localStorage.getItem('userId')   || 1;
+const userName = localStorage.getItem('userName') || 'there';
+
+// ── State ─────────────────────────────────────────────────────
+let currentLat     = null;
+let currentLng     = null;
+let firstContactPhone = null;  // ✅ stores real contact phone from API
+
+document.getElementById('userName').textContent = userName;
+
+// ── Boot ─────────────────────────────────────────────────────
+window.onload = () => {
+  getLocation();
+  loadContacts();
+  loadRecentActivity();
+};
+
+// ── GPS ──────────────────────────────────────────────────────
+function getLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    currentLat = pos.coords.latitude;
+    currentLng = pos.coords.longitude;
+    const url  = 'https://maps.google.com/?q=' + currentLat + ',' + currentLng;
+    document.getElementById('locationText').textContent =
+      'Lat: ' + currentLat.toFixed(5) + '  Lng: ' + currentLng.toFixed(5);
+    document.getElementById('mapLink').href = url;
+  }, () => {
+    document.getElementById('locationText').textContent = 'Location access denied';
+  });
+}
+
+// ── Load contacts + set first contact phone ───────────────────
+function loadContacts() {
+  fetch(API + '/api/contact/all')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('statContacts').textContent = data.length;
+
+      if (data.length > 0) {
+        // ✅ Store first contact's phone for Call/SMS/WhatsApp
+        firstContactPhone = data[0].phone;
+        document.getElementById('contactHint').textContent =
+          'Call/SMS will contact: ' + data[0].name + ' (' + data[0].phone + ')';
+      } else {
+        document.getElementById('contactHint').textContent =
+          'Add contacts to enable Call/SMS buttons';
+      }
+
+      const el = document.getElementById('quickContacts');
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:16px"><a href="contacts.html" style="color:var(--rose-lt)">Add emergency contacts →</a></div>';
+        return;
+      }
+      el.innerHTML = data.slice(0,3).map(c => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:9px;background:rgba(255,255,255,.03);margin-bottom:8px">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--rose-dk));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.88rem;flex-shrink:0">${c.name[0].toUpperCase()}</div>
+          <div style="flex:1"><div style="font-size:.88rem;font-weight:500">${c.name}</div><div style="font-size:.76rem;color:var(--muted)">${c.phone}</div></div>
+          <a href="tel:${c.phone}" style="color:var(--green);font-size:.8rem;text-decoration:none">📞</a>
+        </div>`).join('');
+    }).catch(() => {});
+}
+
+// ── SOS ──────────────────────────────────────────────────────
+function sendSOS() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported', 'err'); return; }
+  const btn    = document.getElementById('sosBtn');
+  const status = document.getElementById('sosStatus');
+  btn.textContent = '...'; btn.classList.add('sending'); btn.disabled = true;
+  status.textContent = 'Getting location...';
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    currentLat = lat; currentLng = lon;
+    status.textContent = 'Sending alert...';
+
+    fetch(API + '/api/sos/alert', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: parseInt(userId), latitude: lat, longitude: lon })
+    })
+    .then(r => r.json())
+    .then(() => {
+      btn.textContent = '✓'; btn.classList.remove('sending'); btn.classList.add('sent');
+      status.innerHTML = '✅ SOS sent! Telegram alert delivered.';
+      showToast('🚨 SOS Alert sent! Contacts notified via Telegram.', 'ok');
+      loadRecentActivity();
+      document.getElementById('statAlerts').textContent =
+        parseInt(document.getElementById('statAlerts').textContent) + 1;
+      setTimeout(() => {
+        btn.textContent = 'SOS'; btn.classList.remove('sent'); btn.disabled = false;
+        status.textContent = 'Press to send emergency alert to all contacts';
+      }, 8000);
+    })
+    .catch(() => {
+      btn.textContent = 'SOS'; btn.classList.remove('sending'); btn.disabled = false;
+      status.textContent = 'Press to send emergency alert to all contacts';
+      showToast('❌ Failed to send SOS. Is the server running?', 'err');
+    });
+  }, () => {
+    btn.textContent = 'SOS'; btn.classList.remove('sending'); btn.disabled = false;
+    showToast('❌ Location access denied. Please allow location.', 'err');
+  });
+}
+
+// ── ✅ I'm Safe Check-in ──────────────────────────────────────
+function doSafeCheckin() {
+  navigator.geolocation.getCurrentPosition(pos => {
+    fetch(API + '/api/checkin/safe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId:    parseInt(userId),
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        note:      'Safe check-in from app'
+      })
+    })
+    .then(r => r.json())
+    .then(() => {
+      showToast('✅ Safe check-in recorded! Contacts know you are safe.', 'ok');
+      document.getElementById('statCheckins').textContent =
+        parseInt(document.getElementById('statCheckins').textContent) + 1;
+      loadRecentActivity();
+    })
+    .catch(() => showToast('❌ Check-in failed. Is server running?', 'err'));
+  }, () => {
+    // If location denied, still do checkin without coords
+    fetch(API + '/api/checkin/safe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: parseInt(userId), latitude: 0, longitude: 0, note: 'Safe check-in (no GPS)' })
+    }).then(() => showToast('✅ Safe check-in recorded!', 'ok'));
+  });
+}
+
+// ── ✅ Call/SMS/WhatsApp — use REAL contact phone ─────────────
+function callContact() {
+  const phone = firstContactPhone || localStorage.getItem('userPhone');
+  if (!phone) { showToast('No contacts found. Add a contact first!', 'err'); return; }
+  window.location.href = 'tel:' + phone;
+}
+
+function sendSMS() {
+  const phone   = firstContactPhone || localStorage.getItem('userPhone');
+  const loc     = currentLat ? 'https://maps.google.com/?q='+currentLat+','+currentLng : '';
+  const message = '🚨 SOS ALERT! I need help! ' + loc;
+  if (!phone) { showToast('No contacts found. Add a contact first!', 'err'); return; }
+  window.location.href = 'sms:' + phone + '?body=' + encodeURIComponent(message);
+}
+
+function sendWhatsApp() {
+  const phone   = firstContactPhone ? '91' + firstContactPhone.replace(/\D/g,'') : '';
+  const loc     = currentLat ? 'https://maps.google.com/?q='+currentLat+','+currentLng : '';
+  const message = '🚨 SOS ALERT! I need immediate help! ' + loc;
+  if (!phone) { showToast('No contacts found. Add a contact first!', 'err'); return; }
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(message));
+}
+
+// ── Recent Activity (SOS alerts + checkins combined) ──────────
+function loadRecentActivity() {
+  Promise.all([
+    fetch(API + '/api/sos/all').then(r => r.json()).catch(() => []),
+    fetch(API + '/api/checkin/history/' + userId).then(r => r.json()).catch(() => [])
+  ]).then(([alerts, checkins]) => {
+    document.getElementById('statAlerts').textContent   = alerts.length;
+    document.getElementById('statCheckins').textContent = checkins.length;
+
+    const el = document.getElementById('recentActivity');
+    if (!alerts.length && !checkins.length) {
+      el.innerHTML = '<div class="empty-state">No activity yet. Stay safe! 💕</div>';
+      return;
+    }
+
+    // Build combined list with type label
+    const allActivity = [
+      ...alerts.map(a => ({ type: 'sos', time: a.time, id: a.id, mapLink: a.mapLink })),
+      ...checkins.map(c => ({ type: 'safe', time: c.checkedInAt, id: c.id, note: c.note }))
+    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 6);
+
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' +
+      allActivity.map(item => `
+        <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:9px;background:rgba(255,255,255,.03);border-left:3px solid ${item.type==='sos' ? 'var(--rose)' : 'var(--green)'}">
+          <div style="width:8px;height:8px;border-radius:50%;background:${item.type==='sos' ? 'var(--rose)' : 'var(--green)'};flex-shrink:0"></div>
+          <div style="flex:1;font-size:.85rem;color:rgba(255,255,255,.8)">
+            ${item.type === 'sos'
+              ? '🚨 SOS Alert sent'
+              : '✅ Safe check-in — ' + (item.note || 'All good')}
+          </div>
+          <div style="font-size:.75rem;color:var(--muted)">${item.time ? new Date(item.time).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '—'}</div>
+          ${item.mapLink ? '<a href="'+item.mapLink+'" target="_blank" style="font-size:.75rem;color:var(--rose-lt);text-decoration:none">🗺️</a>' : ''}
+        </div>`).join('') +
+    '</div>';
+  });
+}
+
+function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>

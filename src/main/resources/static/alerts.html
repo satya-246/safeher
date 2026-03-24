@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHer — Alerts</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">Safe<span>Her</span></div>
+  <div class="nav-links">
+    <a href="index.html"    class="nav-link">🏠 <span>Home</span></a>
+    <a href="alerts.html"   class="nav-link active">🚨 <span>Alerts</span></a>
+    <a href="contacts.html" class="nav-link">👥 <span>Contacts</span></a>
+    <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px;animation:fadeUp .6s ease both">
+    <div>
+      <h1 style="font-size:clamp(1.5rem,3vw,2.2rem)">SOS <span style="color:var(--rose)">Alert History</span></h1>
+      <p class="text-muted" style="margin-top:4px">All emergency alerts sent from your account</p>
+    </div>
+    <button class="btn btn-primary" onclick="sendQuickSOS()">🚨 Quick SOS</button>
+  </div>
+
+  <!-- Stats row -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;animation:fadeUp .6s .1s ease both;opacity:0;animation-fill-mode:forwards">
+    <div class="card" style="text-align:center;padding:20px 12px">
+      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--rose-lt)" id="totalAlerts">—</div>
+      <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Total Alerts</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px 12px">
+      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green)" id="lastAlert">—</div>
+      <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Last Alert</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px 12px">
+      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--gold)">TG</div>
+      <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Notified Via</div>
+    </div>
+  </div>
+
+  <!-- Map iframe (shows when map is clicked) -->
+  <div id="mapSection" style="display:none;margin-bottom:20px;animation:fadeUp .3s ease both">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span style="font-size:.8rem;font-weight:500">📍 Alert Location</span>
+        <button onclick="closeMap()" class="btn btn-danger btn-sm" style="border-radius:8px;padding:5px 12px;font-size:.75rem">✕ Close</button>
+      </div>
+      <iframe id="mapFrame" width="100%" height="280" style="border:0;display:block" loading="lazy"></iframe>
+    </div>
+  </div>
+
+  <!-- Alerts table -->
+  <div class="card" style="animation:fadeUp .6s .2s ease both;opacity:0;animation-fill-mode:forwards">
+    <div class="card-title">🚨 All Alerts (<span id="alertCount">0</span>)</div>
+    <div id="alertsContainer"><div class="empty-state">Loading alerts...</div></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API    = 'http://10.195.40.223:8086';
+const userId = localStorage.getItem('userId') || 1;
+
+window.onload = loadAlerts;
+
+function loadAlerts() {
+  fetch(API + '/api/sos/all')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('alertCount').textContent  = data.length;
+      document.getElementById('totalAlerts').textContent = data.length;
+
+      if (data.length > 0) {
+        const last = data[data.length - 1];
+        const t    = last.time ? new Date(last.time) : null;
+        document.getElementById('lastAlert').textContent = t
+          ? t.toLocaleDateString('en-IN', { day:'2-digit', month:'short' })
+          : 'N/A';
+      }
+
+      const el = document.getElementById('alertsContainer');
+      if (!data.length) {
+        el.innerHTML = '<div class="empty-state">No alerts yet. Stay safe! 💕</div>';
+        return;
+      }
+
+      el.innerHTML = '<table class="tbl"><thead><tr><th>#</th><th>User ID</th><th>Latitude</th><th>Longitude</th><th>Danger</th><th>Time</th><th>Action</th></tr></thead><tbody>' +
+        [...data].reverse().map(a => `
+          <tr>
+            <td><span class="badge badge-rose">#${a.id}</span></td>
+            <td><span class="badge badge-muted">User ${a.userId}</span></td>
+            <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.latitude).toFixed(6)}</td>
+            <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.longitude).toFixed(6)}</td>
+            <td>${a.dangerLevel ? '<span class="badge badge-rose">'+a.dangerLevel+'</span>' : '<span class="badge badge-muted">N/A</span>'}</td>
+            <td class="text-muted" style="font-size:.8rem">${a.time ? new Date(a.time).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '—'}</td>
+            <td>${a.mapLink
+              ? `<button class="btn btn-outline btn-sm" style="border-radius:8px;font-size:.75rem" onclick="showMap('${a.mapLink}')">🗺️ Map</button>`
+              : '—'}</td>
+          </tr>
+        `).join('') + '</tbody></table>';
+    })
+    .catch(() => {
+      document.getElementById('alertsContainer').innerHTML =
+        '<div class="empty-state">Cannot connect to server. Make sure Spring Boot is running on port 8086.</div>';
+    });
+}
+
+function showMap(link) {
+  if (!link) return;
+  const coords    = link.split('?q=')[1];
+  const embedLink = 'https://maps.google.com/maps?q=' + coords + '&output=embed';
+  document.getElementById('mapFrame').src = embedLink;
+  document.getElementById('mapSection').style.display = 'block';
+  document.getElementById('mapSection').scrollIntoView({ behavior: 'smooth' });
+}
+function closeMap() {
+  document.getElementById('mapSection').style.display = 'none';
+  document.getElementById('mapFrame').src = '';
+}
+
+function sendQuickSOS() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported', 'err'); return; }
+  showToast('📍 Getting location...', 'ok');
+  navigator.geolocation.getCurrentPosition(pos => {
+    fetch(API + '/api/sos/alert', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: parseInt(userId), latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+    })
+    .then(r => r.json())
+    .then(() => { showToast('🚨 SOS sent!', 'ok'); loadAlerts(); })
+    .catch(() => showToast('❌ SOS failed', 'err'));
+  });
+}
+
+function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

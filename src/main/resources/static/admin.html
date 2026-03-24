@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHer — Admin Dashboard</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  body { background: var(--night); }
+
+  /* Admin nav override */
+  .admin-nav {
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px;
+    background: rgba(15,10,12,.92); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(232,41,74,.15);
+  }
+  .admin-badge {
+    font-size: .7rem; padding: 2px 10px; border-radius: 999px;
+    background: rgba(232,41,74,.15); color: var(--rose-lt);
+    border: 1px solid rgba(232,41,74,.25); margin-left: 10px;
+  }
+
+  /* Sidebar tabs */
+  .tab-bar { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 10px 20px; border-radius: 999px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: .85rem; font-weight: 500;
+    background: rgba(255,255,255,.06); color: rgba(255,255,255,.55);
+    transition: all .2s;
+  }
+  .tab-btn:hover { background: rgba(232,41,74,.12); color: var(--white); }
+  .tab-btn.active { background: var(--rose); color: var(--white); }
+
+  /* Section panels */
+  .panel { display: none; animation: fadeUp .4s ease; }
+  .panel.active { display: block; }
+
+  /* Stat cards row */
+  .admin-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 24px; }
+  .admin-stat { background: var(--card); border: 1px solid rgba(232,41,74,.1); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; }
+  .admin-stat-icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(232,41,74,.12); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+  .admin-stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; color: var(--rose-lt); line-height: 1; }
+  .admin-stat-lbl { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+
+  @media(max-width:640px) { .admin-stats { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Admin Nav -->
+<nav class="admin-nav">
+  <div style="display:flex;align-items:center">
+    <div class="nav-logo">Safe<span>Her</span></div>
+    <span class="admin-badge">ADMIN</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:.82rem;color:var(--muted)">Logged in as Admin</span>
+    <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div style="margin-bottom:28px;animation:fadeUp .6s ease both">
+    <h1 style="font-size:clamp(1.5rem,3vw,2.2rem)">Admin <span style="color:var(--rose)">Dashboard</span></h1>
+    <p class="text-muted" style="margin-top:4px">Monitor all users, alerts and contacts</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="admin-stats" style="animation:fadeUp .6s .1s ease both;opacity:0;animation-fill-mode:forwards">
+    <div class="admin-stat">
+      <div class="admin-stat-icon">👤</div>
+      <div><div class="admin-stat-num" id="totalUsers">—</div><div class="admin-stat-lbl">Total Users</div></div>
+    </div>
+    <div class="admin-stat">
+      <div class="admin-stat-icon">🚨</div>
+      <div><div class="admin-stat-num" id="totalAlerts">—</div><div class="admin-stat-lbl">SOS Alerts</div></div>
+    </div>
+    <div class="admin-stat">
+      <div class="admin-stat-icon">👥</div>
+      <div><div class="admin-stat-num" id="totalContacts">—</div><div class="admin-stat-lbl">Contacts</div></div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar" style="animation:fadeUp .6s .2s ease both;opacity:0;animation-fill-mode:forwards">
+    <button class="tab-btn active" onclick="showTab('users')">👤 Users</button>
+    <button class="tab-btn" onclick="showTab('alerts')">🚨 SOS Alerts</button>
+    <button class="tab-btn" onclick="showTab('contacts')">👥 Contacts</button>
+  </div>
+
+  <!-- USERS Panel -->
+  <div class="panel active" id="panel-users">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin:0">Registered Users</div>
+        <button class="btn btn-outline btn-sm" style="border-radius:8px" onclick="loadUsers()">🔄 Refresh</button>
+      </div>
+      <div id="usersTable"><div class="empty-state">Click Refresh to load users</div></div>
+    </div>
+  </div>
+
+  <!-- ALERTS Panel -->
+  <div class="panel" id="panel-alerts">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin:0">All SOS Alerts</div>
+        <button class="btn btn-outline btn-sm" style="border-radius:8px" onclick="loadAlerts()">🔄 Refresh</button>
+      </div>
+      <div id="alertsTable"><div class="empty-state">Click Refresh to load alerts</div></div>
+    </div>
+  </div>
+
+  <!-- CONTACTS Panel -->
+  <div class="panel" id="panel-contacts">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin:0">All Emergency Contacts</div>
+        <button class="btn btn-outline btn-sm" style="border-radius:8px" onclick="loadContacts()">🔄 Refresh</button>
+      </div>
+      <div id="contactsTable"><div class="empty-state">Click Refresh to load contacts</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://10.195.40.223:8086';
+
+// Auth guard
+if (localStorage.getItem('admin') !== 'true') {
+  window.location.href = 'admin-login.html';
+}
+
+// Auto-load all on start
+window.onload = () => { loadUsers(); loadAlerts(); loadContacts(); };
+
+// ── Tabs ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Users ─────────────────────────────────────────────────────
+function loadUsers() {
+  document.getElementById('usersTable').innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+  fetch(API + '/api/admin/users', { headers: { 'adminKey': 'safeher@admin2026' } })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('totalUsers').textContent = data.length;
+      if (!data.length) { document.getElementById('usersTable').innerHTML = '<div class="empty-state">No users registered yet</div>'; return; }
+      document.getElementById('usersTable').innerHTML =
+        '<table class="tbl"><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th></tr></thead><tbody>' +
+        data.map(u => `<tr>
+          <td><span class="badge badge-muted">#${u.id}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--rose-dk));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0">${u.name ? u.name[0].toUpperCase() : '?'}</div>
+              <span>${u.name || '—'}</span>
+            </div>
+          </td>
+          <td class="text-muted">${u.email || '—'}</td>
+          <td>${u.phone ? '<a href="tel:'+u.phone+'" style="color:var(--green);text-decoration:none">'+u.phone+'</a>' : '—'}</td>
+        </tr>`).join('') + '</tbody></table>';
+    })
+    .catch(() => { document.getElementById('usersTable').innerHTML = '<div class="empty-state">Cannot connect to server</div>'; });
+}
+
+// ── Alerts ────────────────────────────────────────────────────
+function loadAlerts() {
+  document.getElementById('alertsTable').innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+  fetch(API + '/api/admin/alerts', { headers: { 'adminKey': 'safeher@admin2026' } })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('totalAlerts').textContent = data.length;
+      if (!data.length) { document.getElementById('alertsTable').innerHTML = '<div class="empty-state">No SOS alerts yet</div>'; return; }
+      document.getElementById('alertsTable').innerHTML =
+        '<table class="tbl"><thead><tr><th>#</th><th>User</th><th>Latitude</th><th>Longitude</th><th>Danger</th><th>Time</th><th>Map</th></tr></thead><tbody>' +
+        [...data].reverse().map(a => `<tr>
+          <td><span class="badge badge-rose">#${a.id}</span></td>
+          <td><span class="badge badge-muted">User ${a.userId}</span></td>
+          <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.latitude).toFixed(5)}</td>
+          <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.longitude).toFixed(5)}</td>
+          <td>${a.dangerLevel ? '<span class="badge badge-rose">'+a.dangerLevel+'</span>' : '<span class="badge badge-muted">—</span>'}</td>
+          <td class="text-muted" style="font-size:.78rem">${a.time ? new Date(a.time).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '—'}</td>
+          <td>${a.mapLink ? '<a href="'+a.mapLink+'" target="_blank" class="btn btn-outline btn-sm" style="border-radius:6px;font-size:.72rem">🗺️ View</a>' : '—'}</td>
+        </tr>`).join('') + '</tbody></table>';
+    })
+    .catch(() => { document.getElementById('alertsTable').innerHTML = '<div class="empty-state">Cannot connect to server</div>'; });
+}
+
+// ── Contacts ──────────────────────────────────────────────────
+function loadContacts() {
+  document.getElementById('contactsTable').innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+  fetch(API + '/api/admin/contacts', { headers: { 'adminKey': 'safeher@admin2026' } })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('totalContacts').textContent = data.length;
+      if (!data.length) { document.getElementById('contactsTable').innerHTML = '<div class="empty-state">No contacts yet</div>'; return; }
+      document.getElementById('contactsTable').innerHTML =
+        '<table class="tbl"><thead><tr><th>ID</th><th>User</th><th>Name</th><th>Phone</th><th>Action</th></tr></thead><tbody>' +
+        data.map(c => `<tr>
+          <td><span class="badge badge-muted">#${c.id}</span></td>
+          <td><span class="badge badge-muted">User ${c.userId}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--rose-dk));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;flex-shrink:0">${c.name[0].toUpperCase()}</div>
+              ${c.name}
+            </div>
+          </td>
+          <td><a href="tel:${c.phone}" style="color:var(--green);text-decoration:none">${c.phone}</a></td>
+          <td><button class="btn btn-danger btn-sm" style="border-radius:6px" onclick="deleteContact(${c.id})">🗑 Delete</button></td>
+        </tr>`).join('') + '</tbody></table>';
+    })
+    .catch(() => { document.getElementById('contactsTable').innerHTML = '<div class="empty-state">Cannot connect to server</div>'; });
+}
+
+function deleteContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  fetch(API + '/api/contact/delete/' + id, { method: 'DELETE' })
+    .then(() => { showToast('Contact deleted', 'ok'); loadContacts(); })
+    .catch(() => showToast('❌ Failed', 'err'));
+}
+
+function logout() { localStorage.removeItem('admin'); window.location.href = 'admin-login.html'; }
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
