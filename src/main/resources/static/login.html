@@ -95,7 +95,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'https://safeher-production-682a.up.railway.app';
+const API = window.location.origin;
 
 function switchTab(tab) {
   document.getElementById('login-form').style.display    = tab === 'login'    ? 'block' : 'none';
