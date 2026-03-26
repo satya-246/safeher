@@ -40,7 +40,7 @@
       <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Last Alert</div>
     </div>
     <div class="card" style="text-align:center;padding:20px 12px">
-      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--gold)">TG</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--gold)">SMS</div>
       <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Notified Via</div>
     </div>
   </div>
@@ -58,7 +58,7 @@
 
   <!-- Alerts table -->
   <div class="card" style="animation:fadeUp .6s .2s ease both;opacity:0;animation-fill-mode:forwards">
-    <div class="card-title">🚨 All Alerts (<span id="alertCount">0</span>)</div>
+    <div class="card-title">🚨 Your Alerts (<span id="alertCount">0</span>)</div>
     <div id="alertsContainer"><div class="empty-state">Loading alerts...</div></div>
   </div>
 
@@ -68,13 +68,23 @@
 
 <script>
 const API    = window.location.origin;
-const userId = localStorage.getItem('userId') || 1;
+const userId = localStorage.getItem('userId');
+
+// Redirect to login if not logged in
+if (!userId) { window.location.href = 'login.html'; }
 
 window.onload = loadAlerts;
 
+// ✅ FIX: Use /api/sos/history/{userId} (user-scoped) instead of /api/sos/all
+// Also send requestingUserId header so backend can verify identity
 function loadAlerts() {
-  fetch(API + '/api/sos/all')
-    .then(r => r.json())
+  fetch(API + '/api/sos/history/' + userId, {
+    headers: { 'requestingUserId': userId }        // ← REQUIRED by backend
+  })
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      return r.json();
+    })
     .then(data => {
       document.getElementById('alertCount').textContent  = data.length;
       document.getElementById('totalAlerts').textContent = data.length;
@@ -93,11 +103,10 @@ function loadAlerts() {
         return;
       }
 
-      el.innerHTML = '<table class="tbl"><thead><tr><th>#</th><th>User ID</th><th>Latitude</th><th>Longitude</th><th>Danger</th><th>Time</th><th>Action</th></tr></thead><tbody>' +
+      el.innerHTML = '<table class="tbl"><thead><tr><th>#</th><th>Latitude</th><th>Longitude</th><th>Danger</th><th>Time</th><th>Action</th></tr></thead><tbody>' +
         [...data].reverse().map(a => `
           <tr>
             <td><span class="badge badge-rose">#${a.id}</span></td>
-            <td><span class="badge badge-muted">User ${a.userId}</span></td>
             <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.latitude).toFixed(6)}</td>
             <td style="font-family:monospace;font-size:.82rem">${parseFloat(a.longitude).toFixed(6)}</td>
             <td>${a.dangerLevel ? '<span class="badge badge-rose">'+a.dangerLevel+'</span>' : '<span class="badge badge-muted">N/A</span>'}</td>
@@ -108,9 +117,12 @@ function loadAlerts() {
           </tr>
         `).join('') + '</tbody></table>';
     })
-    .catch(() => {
+    .catch(err => {
+      const msg = err.message === 'forbidden'
+        ? 'Access denied. Please log in again.'
+        : 'Cannot connect to server. Make sure Spring Boot is running.';
       document.getElementById('alertsContainer').innerHTML =
-        '<div class="empty-state">Cannot connect to server. Make sure Spring Boot is running on port 8086.</div>';
+        `<div class="empty-state">${msg}</div>`;
     });
 }
 
@@ -127,18 +139,30 @@ function closeMap() {
   document.getElementById('mapFrame').src = '';
 }
 
+// ✅ FIX: Quick SOS now sends requestingUserId header
 function sendQuickSOS() {
   if (!navigator.geolocation) { showToast('Geolocation not supported', 'err'); return; }
   showToast('📍 Getting location...', 'ok');
   navigator.geolocation.getCurrentPosition(pos => {
     fetch(API + '/api/sos/alert', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: parseInt(userId), latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'requestingUserId': userId                 // ← REQUIRED by backend
+      },
+      body: JSON.stringify({
+        userId:    parseInt(userId),
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude
+      })
     })
-    .then(r => r.json())
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      return r.json();
+    })
     .then(() => { showToast('🚨 SOS sent!', 'ok'); loadAlerts(); })
-    .catch(() => showToast('❌ SOS failed', 'err'));
-  });
+    .catch(err => showToast(err.message === 'forbidden' ? '❌ Access denied' : '❌ SOS failed', 'err'));
+  }, () => showToast('❌ Location access denied', 'err'));
 }
 
 function logout() { localStorage.clear(); window.location.href = 'login.html'; }

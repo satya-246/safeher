@@ -54,7 +54,6 @@
 
 <script>
 const API    = window.location.origin;
-// ✅ Get the LOGGED IN user's ID from localStorage
 const userId = localStorage.getItem('userId');
 
 // If not logged in, redirect to login
@@ -62,10 +61,16 @@ if (!userId) { window.location.href = 'login.html'; }
 
 window.onload = loadContacts;
 
+// ✅ FIX: All contact requests now include requestingUserId header
+// so the backend can verify only THIS user's contacts are returned
 function loadContacts() {
-  // ✅ Use /api/contact/user/{userId} — returns ONLY this user's contacts
-  fetch(API + '/api/contact/user/' + userId)
-    .then(r => r.json())
+  fetch(API + '/api/contact/user/' + userId, {
+    headers: { 'requestingUserId': userId }          // ← REQUIRED by backend
+  })
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      return r.json();
+    })
     .then(data => {
       document.getElementById('contactCount').textContent = data.length;
       const el = document.getElementById('contactsList');
@@ -94,9 +99,12 @@ function loadContacts() {
         </div>
       `).join('');
     })
-    .catch(() => {
+    .catch(err => {
+      const msg = err.message === 'forbidden'
+        ? 'Access denied. Please log in again.'
+        : 'Cannot connect to server.';
       document.getElementById('contactsList').innerHTML =
-        '<div class="empty-state">Cannot connect to server.</div>';
+        `<div class="empty-state">${msg}</div>`;
     });
 }
 
@@ -116,11 +124,22 @@ async function addContact() {
   btn.innerHTML = '<span class="spinner"></span>Adding...'; btn.disabled = true;
 
   try {
-    const res  = await fetch(API + '/api/contact/add', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      // ✅ Sends the logged-in user's ID so contact is linked to them only
+    // ✅ FIX: Include requestingUserId header so backend verifies ownership
+    const res = await fetch(API + '/api/contact/add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'requestingUserId': userId               // ← REQUIRED by backend
+      },
       body: JSON.stringify({ userId: parseInt(userId), name, phone })
     });
+
+    if (res.status === 403) {
+      showToast('❌ Access denied. Please log in again.', 'err');
+      btn.innerHTML = 'Add Contact'; btn.disabled = false;
+      return;
+    }
+
     const data = await res.json();
     if (data && data.id) {
       closeModal();
@@ -135,9 +154,18 @@ async function addContact() {
 
 function deleteContact(id) {
   if (!confirm('Remove this emergency contact?')) return;
-  fetch(API + '/api/contact/delete/' + id, { method: 'DELETE' })
-    .then(() => { showToast('Contact removed', 'ok'); loadContacts(); })
-    .catch(() => showToast('❌ Failed to delete', 'err'));
+  // ✅ FIX: Include requestingUserId header so backend verifies this
+  // contact actually belongs to the logged-in user before deleting
+  fetch(API + '/api/contact/delete/' + id, {
+    method: 'DELETE',
+    headers: { 'requestingUserId': userId }      // ← REQUIRED by backend
+  })
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      showToast('Contact removed', 'ok');
+      loadContacts();
+    })
+    .catch(err => showToast(err.message === 'forbidden' ? '❌ Access denied' : '❌ Failed to delete', 'err'));
 }
 
 document.getElementById('modal').addEventListener('click', e => {

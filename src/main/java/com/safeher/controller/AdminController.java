@@ -1,8 +1,5 @@
 package com.safeher.controller;
 
-import com.safeher.model.User;
-import com.safeher.model.SOSAlert;
-import com.safeher.model.EmergencyContact;
 import com.safeher.repository.UserRepository;
 import com.safeher.repository.SOSRepository;
 import com.safeher.repository.EmergencyContactRepository;
@@ -11,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -19,39 +15,56 @@ import java.util.Map;
 @CrossOrigin
 public class AdminController {
 
-    // Simple admin password — in a real project this would be in application.properties
+    // Admin password — move this to application.properties / environment variable in production
     private static final String ADMIN_KEY = "safeher@admin2026";
 
     @Autowired private UserRepository userRepository;
     @Autowired private SOSRepository sosRepository;
     @Autowired private EmergencyContactRepository contactRepository;
 
-    // Helper: check admin key from request header
     private boolean isAuthorized(String key) {
         return ADMIN_KEY.equals(key);
     }
 
-    // View all users — requires adminKey header
+    // ── View ALL users ────────────────────────────────────────
     @GetMapping("/users")
-    public ResponseEntity<?> getUsers(@RequestHeader(value="adminKey", required=false) String key) {
+    public ResponseEntity<?> getUsers(
+            @RequestHeader(value = "adminKey", required = false) String key) {
         if (!isAuthorized(key))
             return ResponseEntity.status(403).body(Map.of("error", "Access denied. Invalid admin key."));
         return ResponseEntity.ok(userRepository.findAll());
     }
 
-    // View all SOS alerts — requires adminKey header
+    // ── View ALL SOS alerts (across all users) ────────────────
     @GetMapping("/alerts")
-    public ResponseEntity<?> getAlerts(@RequestHeader(value="adminKey", required=false) String key) {
+    public ResponseEntity<?> getAlerts(
+            @RequestHeader(value = "adminKey", required = false) String key) {
         if (!isAuthorized(key))
             return ResponseEntity.status(403).body(Map.of("error", "Access denied. Invalid admin key."));
         return ResponseEntity.ok(sosRepository.findAll());
     }
 
-    // View all contacts — requires adminKey header
+    // ── View ALL emergency contacts (across all users) ─────────
     @GetMapping("/contacts")
-    public ResponseEntity<?> getContacts(@RequestHeader(value="adminKey", required=false) String key) {
+    public ResponseEntity<?> getContacts(
+            @RequestHeader(value = "adminKey", required = false) String key) {
         if (!isAuthorized(key))
             return ResponseEntity.status(403).body(Map.of("error", "Access denied. Invalid admin key."));
         return ResponseEntity.ok(contactRepository.findAll());
+    }
+
+    // ── Admin delete any contact by ID ────────────────────────
+    // Separate from /api/contact/delete/{id} which requires the contact owner's userId.
+    // This route is protected by adminKey only — regular users cannot reach it.
+    @DeleteMapping("/contact/delete/{id}")
+    public ResponseEntity<?> deleteContact(
+            @PathVariable Long id,
+            @RequestHeader(value = "adminKey", required = false) String key) {
+        if (!isAuthorized(key))
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied. Invalid admin key."));
+        if (!contactRepository.existsById(id))
+            return ResponseEntity.status(404).body(Map.of("error", "Contact not found."));
+        contactRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "Contact deleted by admin."));
     }
 }

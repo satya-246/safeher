@@ -93,7 +93,6 @@
       Press to send emergency alert to all contacts
     </p>
 
-    <!-- Action Pills — now using REAL contact phone -->
     <div class="action-pills">
       <button class="action-pill pill-call" onclick="callContact()">
         <i class="fa fa-phone" style="color:#22c55e"></i>Call
@@ -104,7 +103,6 @@
       <button class="action-pill pill-wa" onclick="sendWhatsApp()">
         <i class="fa-brands fa-whatsapp" style="color:#25D366"></i>WhatsApp
       </button>
-      <!-- ✅ NEW: I'm Safe check-in button -->
       <button class="action-pill pill-safe" onclick="doSafeCheckin()">
         <i class="fa fa-shield-halved" style="color:#f5c842"></i>I'm Safe
       </button>
@@ -139,7 +137,7 @@
       </div>
     </div>
 
-    <!-- Recent alerts + checkins -->
+    <!-- Recent activity -->
     <div class="card" style="grid-column:1/-1">
       <div class="card-title">📋 Recent Activity</div>
       <div id="recentActivity"><div class="empty-state">No activity yet. Stay safe! 💕</div></div>
@@ -152,47 +150,44 @@
 
 <script>
 const API      = window.location.origin;
-const userId   = localStorage.getItem('userId')   || 1;
+const userId   = localStorage.getItem('userId');
 const userName = localStorage.getItem('userName') || 'there';
 
-// ── State ─────────────────────────────────────────────────────
-let currentLat     = null;
-let currentLng     = null;
-let firstContactPhone = null;  // ✅ stores real contact phone from API
+// Redirect to login if not logged in
+if (!userId) { window.location.href = 'login.html'; }
+
+let currentLat        = null;
+let currentLng        = null;
+let firstContactPhone = null;
 
 document.getElementById('userName').textContent = userName;
 
-// ── Boot ─────────────────────────────────────────────────────
-window.onload = () => {
-  getLocation();
-  loadContacts();
-  loadRecentActivity();
-};
-
-// ── GPS ──────────────────────────────────────────────────────
-function getLocation() {
-  if (!navigator.geolocation) return;
+// Auto-get location on load
+if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(pos => {
     currentLat = pos.coords.latitude;
     currentLng = pos.coords.longitude;
-    const url  = 'https://maps.google.com/?q=' + currentLat + ',' + currentLng;
     document.getElementById('locationText').textContent =
-      'Lat: ' + currentLat.toFixed(5) + '  Lng: ' + currentLng.toFixed(5);
-    document.getElementById('mapLink').href = url;
+      `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+    document.getElementById('mapLink').href =
+      `https://maps.google.com/?q=${currentLat},${currentLng}`;
   }, () => {
     document.getElementById('locationText').textContent = 'Location access denied';
   });
 }
 
-// ── Load contacts + set first contact phone ───────────────────
+window.onload = () => { loadContacts(); loadRecentActivity(); };
+
+// ✅ FIX: Send requestingUserId header so backend only returns THIS user's contacts
 function loadContacts() {
-  fetch(API + '/api/contact/all')
-    .then(r => r.json())
+  fetch(API + '/api/contact/user/' + userId, {
+    headers: { 'requestingUserId': userId }        // ← REQUIRED by backend
+  })
+    .then(r => r.ok ? r.json() : [])
     .then(data => {
       document.getElementById('statContacts').textContent = data.length;
 
       if (data.length > 0) {
-        // ✅ Store first contact's phone for Call/SMS/WhatsApp
         firstContactPhone = data[0].phone;
         document.getElementById('contactHint').textContent =
           'Call/SMS will contact: ' + data[0].name + ' (' + data[0].phone + ')';
@@ -215,7 +210,7 @@ function loadContacts() {
     }).catch(() => {});
 }
 
-// ── SOS ──────────────────────────────────────────────────────
+// ✅ FIX: Send requestingUserId header; backend enforces this user's alert only
 function sendSOS() {
   if (!navigator.geolocation) { showToast('Geolocation not supported', 'err'); return; }
   const btn    = document.getElementById('sosBtn');
@@ -230,14 +225,21 @@ function sendSOS() {
     status.textContent = 'Sending alert...';
 
     fetch(API + '/api/sos/alert', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'requestingUserId': userId                 // ← REQUIRED by backend
+      },
       body: JSON.stringify({ userId: parseInt(userId), latitude: lat, longitude: lon })
     })
-    .then(r => r.json())
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      return r.json();
+    })
     .then(() => {
       btn.textContent = '✓'; btn.classList.remove('sending'); btn.classList.add('sent');
-      status.innerHTML = '✅ SOS sent! Telegram alert delivered.';
-      showToast('🚨 SOS Alert sent! Contacts notified via Telegram.', 'ok');
+      status.innerHTML = '✅ SOS sent! Contacts notified.';
+      showToast('🚨 SOS Alert sent! Contacts notified via SMS.', 'ok');
       loadRecentActivity();
       document.getElementById('statAlerts').textContent =
         parseInt(document.getElementById('statAlerts').textContent) + 1;
@@ -246,10 +248,10 @@ function sendSOS() {
         status.textContent = 'Press to send emergency alert to all contacts';
       }, 8000);
     })
-    .catch(() => {
+    .catch(err => {
       btn.textContent = 'SOS'; btn.classList.remove('sending'); btn.disabled = false;
       status.textContent = 'Press to send emergency alert to all contacts';
-      showToast('❌ Failed to send SOS. Is the server running?', 'err');
+      showToast(err.message === 'forbidden' ? '❌ Access denied. Please log in again.' : '❌ Failed to send SOS. Is the server running?', 'err');
     });
   }, () => {
     btn.textContent = 'SOS'; btn.classList.remove('sending'); btn.disabled = false;
@@ -257,7 +259,6 @@ function sendSOS() {
   });
 }
 
-// ── ✅ I'm Safe Check-in ──────────────────────────────────────
 function doSafeCheckin() {
   navigator.geolocation.getCurrentPosition(pos => {
     fetch(API + '/api/checkin/safe', {
@@ -271,14 +272,13 @@ function doSafeCheckin() {
     })
     .then(r => r.json())
     .then(() => {
-      showToast('✅ Safe check-in recorded! Contacts know you are safe.', 'ok');
+      showToast('✅ Safe check-in recorded!', 'ok');
       document.getElementById('statCheckins').textContent =
         parseInt(document.getElementById('statCheckins').textContent) + 1;
       loadRecentActivity();
     })
     .catch(() => showToast('❌ Check-in failed. Is server running?', 'err'));
   }, () => {
-    // If location denied, still do checkin without coords
     fetch(API + '/api/checkin/safe', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: parseInt(userId), latitude: 0, longitude: 0, note: 'Safe check-in (no GPS)' })
@@ -286,7 +286,6 @@ function doSafeCheckin() {
   });
 }
 
-// ── ✅ Call/SMS/WhatsApp — use REAL contact phone ─────────────
 function callContact() {
   const phone = firstContactPhone || localStorage.getItem('userPhone');
   if (!phone) { showToast('No contacts found. Add a contact first!', 'err'); return; }
@@ -309,10 +308,12 @@ function sendWhatsApp() {
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(message));
 }
 
-// ── Recent Activity (SOS alerts + checkins combined) ──────────
+// ✅ FIX: Use /api/sos/history/{userId} (user-scoped) instead of /api/sos/all
 function loadRecentActivity() {
   Promise.all([
-    fetch(API + '/api/sos/all').then(r => r.json()).catch(() => []),
+    fetch(API + '/api/sos/history/' + userId, {
+      headers: { 'requestingUserId': userId }      // ← REQUIRED by backend
+    }).then(r => r.ok ? r.json() : []).catch(() => []),
     fetch(API + '/api/checkin/history/' + userId).then(r => r.json()).catch(() => [])
   ]).then(([alerts, checkins]) => {
     document.getElementById('statAlerts').textContent   = alerts.length;
@@ -324,7 +325,6 @@ function loadRecentActivity() {
       return;
     }
 
-    // Build combined list with type label
     const allActivity = [
       ...alerts.map(a => ({ type: 'sos', time: a.time, id: a.id, mapLink: a.mapLink })),
       ...checkins.map(c => ({ type: 'safe', time: c.checkedInAt, id: c.id, note: c.note }))
